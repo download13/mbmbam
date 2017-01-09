@@ -93,7 +93,6 @@ export default class Player extends Component {
           <label for="offline_opt">Offline Mode</label>
         </span> */}
       </div>
-      <button onClick={() => this.cacheEpisode(currentPodcast, index)}>Download</button>
     </div>;
   }
 
@@ -182,27 +181,6 @@ export default class Player extends Component {
     } catch(e) {
       console.log('Invalid saved JSON');
     }
-  }
-
-  cacheEpisode(podcastName, index) {
-    const episode = this.state.episodes[index];
-    const chan = new MessageChannel();
-
-    const r = new Promise((resolve, reject) => {
-      chan.port1.onmessage = e => {
-        resolve(e.data);
-      };
-    });
-
-    navigator.serviceWorker.getRegistration()
-    .then(reg => reg.active)
-    .then(controller => controller.postMessage({
-      type: 'cache-episode',
-      name: podcastName,
-      index
-    }, [chan.port2]));
-
-    return r;
   }
 }
 
