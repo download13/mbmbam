@@ -1,41 +1,85 @@
 const express = require('express');
-const data = require('./data');
+const {getEpisodes, getEpisode} = require('./data');
 const request = require('request');
 
 const app = express();
 
 app.use(express.static('dist/public'));
 
-app.get("/", (request, response) => {
-  response.sendFile(__dirname + '/views/index.html');
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/views/index.html');
 });
 
 app.get('/list/:name', (req, res, next) => {
-  data.getEpisodes(req.params.name).then(
+  getEpisodes(req.params.name).then(
     episodes => res.send(episodes),
-    err => next(err)
+    err => res.status(404).send('Feed not found')
   );
 });
 
-app.get('/proxyfile', (req, res, next) => {
-  const {url} = req.query;
+app.get('/episodes/:name/:index/image', (req, res) => {
+  const {name, index} = req.params;
 
-  // TODO: Pass on range headers
-  request.get({
-    url,
-    headers: {
-      Range: req.headers.range
+  getEpisode(name, index).then(
+    episode => {
+      console.log('i', name, index, episode)
+      if(episode) {
+        sendRemoteFile(req, res, episode.imageUrl);
+      } else {
+        res.status(404).send('Episode not found');
+      }
+    },
+    err => {
+      console.error(err);
+      res.status(404).send('Feed not found');
     }
-  })
-  .on('response', response => {
-    res.status(response.statusCode);
-    res.append('Content-Type', response.headers['content-type']);
-    res.append('Content-Length', response.headers['content-length']);
-    res.append('Content-Range', response.headers['content-range']);
-  })
-  .pipe(res, {end: true});
+  );
+});
+
+app.get('/episodes/:name/:index/audio', (req, res) => {
+  const {name, index} = req.params;
+
+  getEpisode(name, index).then(
+    episode => {
+      console.log('a', episode)
+      if(episode) {
+        sendRemoteFile(req, res, episode.audioUrl);
+      } else {
+        res.status(404).send('Episode not found');
+      }
+    },
+    err => {
+      console.error(err);
+      res.status(404).send('Feed not found');
+    }
+  );
 });
 
 const listener = app.listen(process.env.PORT || 80, () => {
   console.log('Your app is listening on port ' + listener.address().port);
 });
+
+
+function sendRemoteFile(req, res, url) {
+  const headers = {};
+  console.log('remote file', req.headers)
+  if(req.headers.range) {
+    headers.Range = req.headers.range;
+  }
+
+  request({url, headers})
+  .on('response', ({statusCode, headers}) => {
+    console.log('remote file response', headers)
+    res.status(statusCode);
+    if(headers['content-type']) {
+      res.append('Content-Type', headers['content-type']);
+    }
+    if(headers['content-length']) {
+      res.append('Content-Length', headers['content-length']);
+    }
+    if(headers['content-range']) {
+      res.append('Content-Range', headers['content-range']);
+    }
+  })
+  .pipe(res, {end: true});
+}

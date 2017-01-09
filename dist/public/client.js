@@ -580,6 +580,7 @@ var Player = function (_Component) {
     var _this = _possibleConstructorReturn(this, (Player.__proto__ || Object.getPrototypeOf(Player)).call(this, props));
 
     _this.state = {
+      currentPodcast: 'mbmbam',
       episodes: [],
       index: 0,
       position: 0,
@@ -598,7 +599,7 @@ var Player = function (_Component) {
       var audioEl = this.audioEl;
 
 
-      getEpisodes('mbmbam').then(function (episodes) {
+      getEpisodes(this.state.currentPodcast).then(function (episodes) {
         _this2.setState({ episodes: episodes });
         _this2.load();
       });
@@ -615,19 +616,20 @@ var Player = function (_Component) {
         return _this2.save();
       };
 
-      window.onkeyup = function (e) {
-        if (e.key === 'Space') {
+      window.addEventListener('keyup', function (e) {
+        if (e.code === 'Space') {
           e.preventDefault();
           _this2.togglePlaying();
         }
-      };
+      });
     }
   }, {
     key: 'render',
     value: function render(props, _ref) {
       var _this3 = this;
 
-      var index = _ref.index,
+      var currentPodcast = _ref.currentPodcast,
+          index = _ref.index,
           episodes = _ref.episodes,
           autoplay = _ref.autoplay,
           offline = _ref.offline,
@@ -648,7 +650,7 @@ var Player = function (_Component) {
           { 'class': 'title' },
           title
         ),
-        __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0_preact__["h"])('img', { 'class': 'image', src: imageUrl }),
+        __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0_preact__["h"])('img', { 'class': 'image', src: '/episodes/' + currentPodcast + '/' + index + '/image' }),
         __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0_preact__["h"])('audio', {
           'class': 'audio',
           ref: function ref(el) {
@@ -657,7 +659,7 @@ var Player = function (_Component) {
           controls: true,
           autoplay: autoplay,
           preload: 'auto',
-          src: audioUrl,
+          src: '/episodes/' + currentPodcast + '/' + index + '/audio',
           onPause: function onPause() {
             return _this3.save();
           },
@@ -736,7 +738,7 @@ var Player = function (_Component) {
             'span',
             null,
             __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0_preact__["h"])('input', { type: 'checkbox', id: 'autoplay_opt', checked: autoplay, onChange: function onChange(e) {
-                return _this3.toggleAutoplay(e.target.checked);
+                return _this3.setAutoplay(e.target.checked);
               } }),
             __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0_preact__["h"])(
               'label',
@@ -744,6 +746,13 @@ var Player = function (_Component) {
               'Autoplay'
             )
           )
+        ),
+        __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0_preact__["h"])(
+          'button',
+          { onClick: function onClick() {
+              return _this3.cacheEpisode(currentPodcast, index);
+            } },
+          'Download'
         )
       );
     }
@@ -769,7 +778,7 @@ var Player = function (_Component) {
     key: 'selectEpisode',
     value: function selectEpisode(index) {
       this.setState({ index: index });
-      document.title = this.state.episodes[index];
+      document.title = this.state.episodes[index].title;
     }
   }, {
     key: 'seekBackward',
@@ -794,6 +803,16 @@ var Player = function (_Component) {
       }
     }
   }, {
+    key: 'setAutoplay',
+    value: function setAutoplay(autoplay) {
+      this.setState({ autoplay: autoplay });
+    }
+  }, {
+    key: 'setOffline',
+    value: function setOffline(offline) {
+      this.setState({ offline: offline });
+    }
+  }, {
     key: 'gotoIndexOnEnter',
     value: function gotoIndexOnEnter(e) {
       if (e.key === 'Enter') {
@@ -808,9 +827,7 @@ var Player = function (_Component) {
       var index = parseInt(e.target.value);
 
       if (typeof index === 'number' && !isNaN(index)) {
-        this.setState({
-          index: clamp(index - 1, 0, episodes.length - 1)
-        });
+        this.selectEpisode(clamp(index - 1, 0, episodes.length - 1));
       }
     }
   }, {
@@ -822,7 +839,7 @@ var Player = function (_Component) {
 
 
       if (index < episodes.length - 1) {
-        this.setState({ index: index + 1 });
+        this.selectEpisode(index + 1);
       }
     }
   }, {
@@ -850,10 +867,35 @@ var Player = function (_Component) {
             autoplay = _JSON$parse.autoplay;
 
         this.audioEl.currentTime = position;
-        this.setState({ index: index, autplay: autplay });
+        this.setState({ autoplay: autoplay });
+        this.selectEpisode(index);
       } catch (e) {
         console.log('Invalid saved JSON');
       }
+    }
+  }, {
+    key: 'cacheEpisode',
+    value: function cacheEpisode(podcastName, index) {
+      var episode = this.state.episodes[index];
+      var chan = new MessageChannel();
+
+      var r = new Promise(function (resolve, reject) {
+        chan.port1.onmessage = function (e) {
+          resolve(e.data);
+        };
+      });
+
+      navigator.serviceWorker.getRegistration().then(function (reg) {
+        return reg.active;
+      }).then(function (controller) {
+        return controller.postMessage({
+          type: 'cache-episode',
+          name: podcastName,
+          index: index
+        }, [chan.port2]);
+      });
+
+      return r;
     }
   }]);
 
@@ -872,15 +914,6 @@ function formatTime(n) {
 
   return hours + ':' + minutes;
 }
-
-/*
-    watch: {
-        title: function(title) {
-            document.title = title;
-        }
-    }
-
-*/
 
 function getEpisodes(name) {
   return new Promise(function (resolve, reject) {
@@ -910,32 +943,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 
 
 
-__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0_preact__["render"])(__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0_preact__["h"])(__WEBPACK_IMPORTED_MODULE_1__components_player__["a" /* default */], null), document.getElementById('player-mount'));
+var player = __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0_preact__["h"])(__WEBPACK_IMPORTED_MODULE_1__components_player__["a" /* default */], null);
+
+__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0_preact__["render"])(player, document.getElementById('player-mount'));
 
 if (navigator.serviceWorker) {
   navigator.serviceWorker.register('/sw.js');
-}
-
-function cacheEpisode(index) {
-  var chan = new MessageChannel();
-
-  var r = new Promise(function (resolve, reject) {
-    chan.port1.onmessage = function (e) {
-      resolve(e.data);
-    };
-  });
-
-  navigator.serviceWorker.getRegistration().then(function (reg) {
-    return reg.active;
-  }).then(function (controller) {
-    return controller.postMessage({
-      type: 'cache-episode',
-      audioUrl: player.episodes[index].audioUrl,
-      imageUrl: player.episodes[index].imageUrl
-    }, [chan.port2]);
-  });
-
-  return r;
 }
 
 /***/ }

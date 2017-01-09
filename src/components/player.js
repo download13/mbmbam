@@ -6,6 +6,7 @@ export default class Player extends Component {
     super(props);
 
     this.state = {
+      currentPodcast: 'mbmbam',
       episodes: [],
       index: 0,
       position: 0,
@@ -18,7 +19,7 @@ export default class Player extends Component {
   componentDidMount() {
     const {audioEl} = this;
 
-    getEpisodes('mbmbam').then(episodes => {
+    getEpisodes(this.state.currentPodcast).then(episodes => {
       this.setState({episodes});
       this.load();
     });
@@ -33,28 +34,28 @@ export default class Player extends Component {
 
     window.onbeforeunload = () => this.save();
 
-    window.onkeyup = e => {
-      if(e.key === 'Space') {
+    window.addEventListener('keyup', e => {
+      if(e.code === 'Space') {
         e.preventDefault();
         this.togglePlaying();
       }
-    };
+    });
   }
 
-  render(props, {index, episodes, autoplay, offline, position, duration}) {
+  render(props, {currentPodcast, index, episodes, autoplay, offline, position, duration}) {
     const episode = episodes[index] || {};
     const {title, imageUrl, audioUrl} = episode;
 
     return <div class="player">
       <h1 class="title">{title}</h1>
-      <img class="image" src={imageUrl}/>
+      <img class="image" src={`/episodes/${currentPodcast}/${index}/image`}/>
       <audio
         class="audio"
         ref={el => this.audioEl = el}
         controls
         autoplay={autoplay}
         preload="auto"
-        src={audioUrl}
+        src={`/episodes/${currentPodcast}/${index}/audio`}
         onPause={() => this.save()}
         onEnded={() => this.episodeEnded()}
       ></audio>
@@ -84,14 +85,15 @@ export default class Player extends Component {
       </div>
       <div class="options">
         <span>
-          <input type="checkbox" id="autoplay_opt" checked={autoplay} onChange={e => this.toggleAutoplay(e.target.checked)}/>
+          <input type="checkbox" id="autoplay_opt" checked={autoplay} onChange={e => this.setAutoplay(e.target.checked)}/>
           <label for="autoplay_opt">Autoplay</label>
         </span>
         {/* <span>
-          <input type="checkbox" id="offline_opt" checked={offline} onChange={e => this.toggleOffline(e.target.checked)}/>
+          <input type="checkbox" id="offline_opt" checked={offline} onChange={e => this.setOffline(e.target.checked)}/>
           <label for="offline_opt">Offline Mode</label>
         </span> */}
       </div>
+      <button onClick={() => this.cacheEpisode(currentPodcast, index)}>Download</button>
     </div>;
   }
 
@@ -109,7 +111,7 @@ export default class Player extends Component {
 
   selectEpisode(index) {
     this.setState({index});
-    document.title = this.state.episodes[index];
+    document.title = this.state.episodes[index].title;
   }
 
   seekBackward(seconds) {
@@ -130,6 +132,14 @@ export default class Player extends Component {
     }
   }
 
+  setAutoplay(autoplay) {
+    this.setState({autoplay});
+  }
+
+  setOffline(offline) {
+    this.setState({offline});
+  }
+
   gotoIndexOnEnter(e) {
     if(e.key === 'Enter') {
       this.gotoIndex(e);
@@ -141,9 +151,7 @@ export default class Player extends Component {
     const index = parseInt(e.target.value);
 
     if(typeof index === 'number' && !isNaN(index)) {
-      this.setState({
-        index: clamp(index - 1, 0, episodes.length - 1)
-      });
+      this.selectEpisode(clamp(index - 1, 0, episodes.length - 1));
     }
   }
 
@@ -151,7 +159,7 @@ export default class Player extends Component {
     const {index, episodes} = this.state;
 
     if(index < episodes.length - 1) {
-      this.setState({index: index + 1});
+      this.selectEpisode(index + 1);
     }
   }
 
@@ -169,10 +177,32 @@ export default class Player extends Component {
     try {
       const {index, position, autoplay} = JSON.parse(localStorage.getItem('place'));
       this.audioEl.currentTime = position;
-      this.setState({index, autplay});
+      this.setState({autoplay});
+      this.selectEpisode(index);
     } catch(e) {
       console.log('Invalid saved JSON');
     }
+  }
+
+  cacheEpisode(podcastName, index) {
+    const episode = this.state.episodes[index];
+    const chan = new MessageChannel();
+
+    const r = new Promise((resolve, reject) => {
+      chan.port1.onmessage = e => {
+        resolve(e.data);
+      };
+    });
+
+    navigator.serviceWorker.getRegistration()
+    .then(reg => reg.active)
+    .then(controller => controller.postMessage({
+      type: 'cache-episode',
+      name: podcastName,
+      index
+    }, [chan.port2]));
+
+    return r;
   }
 }
 
@@ -185,15 +215,6 @@ function formatTime(n) {
 
   return hours + ':' + minutes;
 }
-
-/*
-    watch: {
-        title: function(title) {
-            document.title = title;
-        }
-    }
-
-*/
 
 function getEpisodes(name) {
   return new Promise((resolve, reject) => {

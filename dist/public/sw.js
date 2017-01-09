@@ -153,80 +153,187 @@ module.exports = createVisitor;
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_route_parser__ = __webpack_require__(3);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_route_parser___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_0_route_parser__);
-/* harmony export (immutable) */ exports["b"] = on;
-/* harmony export (immutable) */ exports["c"] = cacheAll;
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_range_parser__ = __webpack_require__(10);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1_range_parser___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_1_range_parser__);
+/* harmony export (immutable) */ exports["d"] = on;
+/* harmony export (immutable) */ exports["e"] = cacheAll;
+/* unused harmony export put */
 /* unused harmony export matchCache */
 /* unused harmony export matchCaches */
+/* harmony export (immutable) */ exports["b"] = networkFirst;
+/* harmony export (immutable) */ exports["c"] = cacheFirst;
 /* harmony export (immutable) */ exports["a"] = createRouter;
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+
 
 
 function on(eventName, handler, options) {
-	return addEventListener(eventName, handler, options);
+  return addEventListener(eventName, handler, options);
 }
 
 function cacheAll(cacheName, urls) {
-	return caches.open(cacheName).then(function (cache) {
-		return cache.addAll(urls);
-	});
+  return caches.open(cacheName).then(function (cache) {
+    return cache.addAll(urls);
+  });
 }
 
-function matchCache(cacheName, request) {
-	return caches.open(cacheName).then(function (cache) {
-		return cache.match(request);
-	});
+function put(cacheName, req, res) {
+  return caches.open(cacheName).then(function (cache) {
+    return cache.put(req, res);
+  });
 }
 
-function matchCaches(cacheNames, request) {
-	var tryMatch = function tryMatch(index) {
-		return matchCache(cacheNames[index], request).then(function (response) {
-			if (response) return response;
-			if (index + 1 >= cacheNames.length) return Promise.resolve(null);
-			return tryMatch(index + 1);
-		});
-	};
-
-	return tryMatch(0);
+function matchCache(cacheName, req) {
+  return caches.open(cacheName).then(function (cache) {
+    return cache.match(req);
+  }).then(function (res) {
+    if (res) return rangeResponse(req, res);
+    return res;
+  });
 }
+
+function rangeResponse(req, res) {
+  return res.clone().blob().then(function (body) {
+    var range = __WEBPACK_IMPORTED_MODULE_1_range_parser___default()(body.size, req.headers.get('range') || '');
+
+    if (Array.isArray(range)) {
+      var _range$ = range[0],
+          start = _range$.start,
+          end = _range$.end;
+
+      var partialBody = body.slice(start, end + 1);
+
+      return new Response(partialBody, {
+        status: 206,
+        headers: {
+          'content-type': res.headers.get('content-type'),
+          'content-length': partialBody.size,
+          'content-range': 'bytes ' + start + '-' + end + '/' + body.size
+        }
+      });
+    }
+
+    return res;
+  });
+}
+
+function matchCaches(cacheNames, req) {
+  var tryMatch = function tryMatch(index) {
+    return matchCache(cacheNames[index], req).then(function (res) {
+      if (res) return res;
+      if (index + 1 >= cacheNames.length) return Promise.resolve(null);
+      return tryMatch(index + 1);
+    });
+  };
+
+  return tryMatch(0);
+}
+
+function networkFirst(cacheName) {
+  return function (req, params) {
+    return fetch(req).then(function (res) {
+      return put(cacheName, req, res.clone()).then(function () {
+        return res;
+      });
+    }).catch(function () {
+      return matchCache(cacheName, req);
+    });
+  };
+}
+
+function cacheFirst(cacheName) {
+  return function (req, params) {
+    return matchCache(cacheName, req).then(function (res) {
+      if (res) return res;else return fetch(req);
+    });
+  };
+}
+
+function getHeaders(headers) {
+  var r = '';
+  var _iteratorNormalCompletion = true;
+  var _didIteratorError = false;
+  var _iteratorError = undefined;
+
+  try {
+    for (var _iterator = headers.entries()[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+      var entry = _step.value;
+
+      r += entry.toString() + '\n';
+    }
+  } catch (err) {
+    _didIteratorError = true;
+    _iteratorError = err;
+  } finally {
+    try {
+      if (!_iteratorNormalCompletion && _iterator.return) {
+        _iterator.return();
+      }
+    } finally {
+      if (_didIteratorError) {
+        throw _iteratorError;
+      }
+    }
+  }
+
+  return r;
+}
+
+var Router = function () {
+  function Router() {
+    _classCallCheck(this, Router);
+
+    this.routes = [];
+
+    this.dispatch = this.dispatch.bind(this);
+  }
+
+  _createClass(Router, [{
+    key: 'get',
+    value: function get(path, handler) {
+      var route = new __WEBPACK_IMPORTED_MODULE_0_route_parser___default.a(path);
+      this.routes.push({ route: route, handler: handler });
+    }
+  }, {
+    key: 'dispatch',
+    value: function dispatch(e) {
+      var request = e.request;
+
+      var url = new URL(request.url);
+
+      if (url.origin === location.origin) {
+        for (var i = 0; i < this.routes.length; i++) {
+          var _routes$i = this.routes[i],
+              route = _routes$i.route,
+              handler = _routes$i.handler;
+
+          var params = route.match(url.pathname);
+          if (!params) continue;
+
+          var res = handler(request, params);
+          if (res instanceof Response) {
+            e.respondWith(Promise.resolve(res));
+            return;
+          } else if (res instanceof Promise) {
+            e.respondWith(res);
+            return;
+          } else {
+            console.error('Error handling ' + request.url);
+            throw new Error('Invalid handler response. Must be instance of Response or Promise.');
+          }
+        }
+      }
+    }
+  }]);
+
+  return Router;
+}();
 
 function createRouter() {
-	var routes = [];
-	var servingCaches = [];
-
-	return {
-		get: function get(path, handler) {
-			var route = new __WEBPACK_IMPORTED_MODULE_0_route_parser___default.a(path);
-			routes.push({ route: route, handler: handler });
-		},
-		dispatch: function dispatch(e) {
-			var request = e.request;
-
-
-			for (var _ref in routes) {
-				var route = _ref.route;
-				var handler = _ref.handler;
-
-				var params = route.match(request.url);
-				if (!params) continue;
-
-				var response = handler(request, params);
-				if (response instanceof Response) {
-					e.respondWith(Promise.resolve(response));
-					return;
-				} else if (response instanceof Promise) {
-					e.respondWith(response);
-					return;
-				} else {
-					console.error('Error handling ' + request.url);
-					throw new Error('Invalid handler response. Must be instance of Response or Promise.');
-				}
-			}
-
-			return matchCaches(servingCaches, request);
-		},
-		serveCache: function serveCache(cacheName) {
-			servingCaches.push(cacheName);
-		}
-	};
+  return new Router();
 }
 
 /***/ },
@@ -1156,37 +1263,232 @@ module.exports = ReverseVisitor;
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0_swkit__ = __webpack_require__(2);
+var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
+
 
 
 var router = __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0_swkit__["a" /* createRouter */])();
 
-//router.get('/', toolbox.networkFirst);
-//router.get('/style.css', toolbox.networkFirst);
-//router.get('/media-embedded.css', toolbox.networkFirst);
-//router.get('/client.js', toolbox.networkFirst);
-router.get('/episode/:episode', function (request, params) {
+var precacheNetworkFirst = __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0_swkit__["b" /* networkFirst */])('precache');
+var episodesCacheFirst = __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0_swkit__["c" /* cacheFirst */])('episodes');
+
+router.get('/', precacheNetworkFirst);
+router.get('/style.css', precacheNetworkFirst);
+router.get('/media-embedded.css', precacheNetworkFirst);
+router.get('/client.js', precacheNetworkFirst);
+router.get('/list/mbmbam', precacheNetworkFirst);
+
+router.get('/list/:name', function (request, params) {
   // TODO Range request a certain cached item
+  return fetch(request);
 });
 
-router.serveCache('precache');
+router.get('/episodes/:name/:index/image', episodesCacheFirst);
 
-__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0_swkit__["b" /* on */])('install', function (e) {
-  e.waitUntil(__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0_swkit__["c" /* cacheAll */])('precache', ['/', '/style.css', '/media-embedded.css', '/client.js']).then(skipWaiting()));
+router.get('/episodes/:name/:index/audio', episodesCacheFirst);
+
+__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0_swkit__["d" /* on */])('fetch', router.dispatch);
+
+__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0_swkit__["d" /* on */])('install', function (e) {
+  e.waitUntil(__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0_swkit__["e" /* cacheAll */])('precache', ['/', '/style.css', '/media-embedded.css', '/client.js', '/list/mbmbam']).then(skipWaiting()));
 });
 
-__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0_swkit__["b" /* on */])('activate', function (e) {
+__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0_swkit__["d" /* on */])('activate', function (e) {
   e.waitUntil(clients.claim());
 });
 
-__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0_swkit__["b" /* on */])('message', function (e) {
-  switch (e.data.type) {
-    case 'cache-episode':
-      __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0_swkit__["c" /* cacheAll */])('episodes', [e.data.audioUrl, e.data.imageUrl]).then(function () {
-        e.ports[0].postMessage(true);
-      });
-      break;
-  }
+__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0_swkit__["d" /* on */])('message', function (e) {
+  console.log('message', e.data);
+
+  (function () {
+    switch (e.data.type) {
+      case 'cache-episode':
+        var _e$data = e.data,
+            name = _e$data.name,
+            index = _e$data.index;
+
+        var imageUrl = '/episodes/' + name + '/' + index + '/image';
+        var audioUrl = '/episodes/' + name + '/' + index + '/audio';
+
+        Promise.all([caches.open('episodes'), fetch(imageUrl), fetch(audioUrl)]).then(function (_ref) {
+          var _ref2 = _slicedToArray(_ref, 3),
+              cache = _ref2[0],
+              imageResponse = _ref2[1],
+              audioResponse = _ref2[2];
+
+          return Promise.all([cache.put(imageUrl, imageResponse), cache.put(audioUrl, audioResponse)]);
+        }).then(function () {
+          e.ports[0].postMessage(true);
+        });
+        break;
+    }
+  })();
 });
+
+/***/ },
+/* 10 */
+/***/ function(module, exports, __webpack_require__) {
+
+"use strict";
+/*!
+ * range-parser
+ * Copyright(c) 2012-2014 TJ Holowaychuk
+ * Copyright(c) 2015-2016 Douglas Christopher Wilson
+ * MIT Licensed
+ */
+
+
+
+/**
+ * Module exports.
+ * @public
+ */
+
+module.exports = rangeParser
+
+/**
+ * Parse "Range" header `str` relative to the given file `size`.
+ *
+ * @param {Number} size
+ * @param {String} str
+ * @param {Object} [options]
+ * @return {Array}
+ * @public
+ */
+
+function rangeParser (size, str, options) {
+  var index = str.indexOf('=')
+
+  if (index === -1) {
+    return -2
+  }
+
+  // split the range string
+  var arr = str.slice(index + 1).split(',')
+  var ranges = []
+
+  // add ranges type
+  ranges.type = str.slice(0, index)
+
+  // parse all ranges
+  for (var i = 0; i < arr.length; i++) {
+    var range = arr[i].split('-')
+    var start = parseInt(range[0], 10)
+    var end = parseInt(range[1], 10)
+
+    // -nnn
+    if (isNaN(start)) {
+      start = size - end
+      end = size - 1
+    // nnn-
+    } else if (isNaN(end)) {
+      end = size - 1
+    }
+
+    // limit last-byte-pos to current length
+    if (end > size - 1) {
+      end = size - 1
+    }
+
+    // invalid or unsatisifiable
+    if (isNaN(start) || isNaN(end) || start > end || start < 0) {
+      continue
+    }
+
+    // add range
+    ranges.push({
+      start: start,
+      end: end
+    })
+  }
+
+  if (ranges.length < 1) {
+    // unsatisifiable
+    return -1
+  }
+
+  return options && options.combine
+    ? combineRanges(ranges)
+    : ranges
+}
+
+/**
+ * Combine overlapping & adjacent ranges.
+ * @private
+ */
+
+function combineRanges (ranges) {
+  var ordered = ranges.map(mapWithIndex).sort(sortByRangeStart)
+
+  for (var j = 0, i = 1; i < ordered.length; i++) {
+    var range = ordered[i]
+    var current = ordered[j]
+
+    if (range.start > current.end + 1) {
+      // next range
+      ordered[++j] = range
+    } else if (range.end > current.end) {
+      // extend range
+      current.end = range.end
+      current.index = Math.min(current.index, range.index)
+    }
+  }
+
+  // trim ordered array
+  ordered.length = j + 1
+
+  // generate combined range
+  var combined = ordered.sort(sortByRangeIndex).map(mapWithoutIndex)
+
+  // copy ranges type
+  combined.type = ranges.type
+
+  return combined
+}
+
+/**
+ * Map function to add index value to ranges.
+ * @private
+ */
+
+function mapWithIndex (range, index) {
+  return {
+    start: range.start,
+    end: range.end,
+    index: index
+  }
+}
+
+/**
+ * Map function to remove index value from ranges.
+ * @private
+ */
+
+function mapWithoutIndex (range) {
+  return {
+    start: range.start,
+    end: range.end
+  }
+}
+
+/**
+ * Sort function to sort ranges by index.
+ * @private
+ */
+
+function sortByRangeIndex (a, b) {
+  return a.index - b.index
+}
+
+/**
+ * Sort function to sort ranges by start position.
+ * @private
+ */
+
+function sortByRangeStart (a, b) {
+  return a.start - b.start
+}
+
 
 /***/ }
 /******/ ]);
