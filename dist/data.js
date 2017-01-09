@@ -41,11 +41,3 @@ exports.getEpisode = (feedname, index) => {
   return exports.getEpisodes(feedname)
   .then(episodes => episodes[index]);
 };
-
-function secureLibsynUrl(url) {
-  return url.replace(/^http:\/\/static\.libsyn\.com/, 'https://ssl-static.libsyn.com');
-}
-
-function secureUrl(url) {
-  return url.replace(/^http:/, 'https:');
-}
