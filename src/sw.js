@@ -1,10 +1,8 @@
 import {
     on,
     cacheAll,
-    matchCache,
     createRouter,
-    networkFirst,
-    cacheFirst
+    networkFirst
 } from 'swkit';
 
 
