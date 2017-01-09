@@ -1,0 +1,26 @@
+{
+  "name": "MBMBAM Player",
+  "short_name": "MBMBAM",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#f92977",
+  "background_color": "#fff6f4",
+  "description": "Easy listening for your favorite podcast!",
+  "icons": [{
+    "src": "https://cdn.gomix.com/e6a6ccd9-0814-49c4-ad6c-2d33f60a4413%2Ffavicon-16x16.png",
+    "sizes": "16x16",
+    "type": "image/png"
+  }, {
+    "src": "https://cdn.gomix.com/e6a6ccd9-0814-49c4-ad6c-2d33f60a4413%2Ffavicon-32x32.png",
+    "sizes": "32x32",
+    "type": "image/png"
+  }, {
+    "src": "https://cdn.gomix.com/e6a6ccd9-0814-49c4-ad6c-2d33f60a4413%2Ffavicon-96x96.png",
+    "sizes": "96x96",
+    "type": "image/png"
+  }, {
+    "src": "https://cdn.gomix.com/e6a6ccd9-0814-49c4-ad6c-2d33f60a4413%2Ffavicon-144x144.png",
+    "sizes": "144x144",
+    "type": "image/png"
+  }]
+}
