@@ -11,7 +11,6 @@ import {
 const router = createRouter();
 
 const precacheNetworkFirst = networkFirst('precache');
-const episodesCacheFirst = cacheFirst('episodes');
 
 router.get('/', precacheNetworkFirst);
 router.get('/style.css', precacheNetworkFirst);
