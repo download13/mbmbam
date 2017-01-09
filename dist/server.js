@@ -22,7 +22,6 @@ app.get('/episodes/:name/:index/image', (req, res) => {
 
   getEpisode(name, index).then(
     episode => {
-      console.log('i', name, index, episode)
       if(episode) {
         sendRemoteFile(req, res, episode.imageUrl);
       } else {
@@ -41,7 +40,6 @@ app.get('/episodes/:name/:index/audio', (req, res) => {
 
   getEpisode(name, index).then(
     episode => {
-      console.log('a', episode)
       if(episode) {
         sendRemoteFile(req, res, episode.audioUrl);
       } else {
@@ -62,14 +60,13 @@ const listener = app.listen(process.env.PORT || 80, () => {
 
 function sendRemoteFile(req, res, url) {
   const headers = {};
-  console.log('remote file', req.headers)
+
   if(req.headers.range) {
     headers.Range = req.headers.range;
   }
 
   request({url, headers})
   .on('response', ({statusCode, headers}) => {
-    console.log('remote file response', headers)
     res.status(statusCode);
     if(headers['content-type']) {
       res.append('Content-Type', headers['content-type']);
