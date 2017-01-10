@@ -1,0 +1,39 @@
+@font-face {
+  font-family: 'media';
+  src: url('/icons.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+}
+
+ [class^="icon-"]:before, [class*=" icon-"]:before {
+  font-family: "media";
+  font-style: normal;
+  font-weight: normal;
+  speak: none;
+
+  display: inline-block;
+  text-decoration: inherit;
+  width: 1em;
+  margin-right: .2em;
+  text-align: center;
+
+  font-variant: normal;
+  text-transform: none;
+
+  line-height: 1em;
+
+  margin-left: .2em;
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.icon-pause:before { content: '\e800'; } /* '' */
+.icon-play:before { content: '\e801'; } /* '' */
+.icon-fast-fw:before { content: '\e802'; } /* '' */
+.icon-fast-bw:before { content: '\e803'; } /* '' */
+.icon-to-end-alt:before { content: '\e804'; } /* '' */
+.icon-to-start-alt:before { content: '\e805'; } /* '' */
+.icon-download:before { content: '\e806'; } /* '' */
+.icon-ok:before { content: '\e807'; } /* '' */
+.icon-spin3:before { content: '\e832'; } /* '' */
