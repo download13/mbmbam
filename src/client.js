@@ -2,7 +2,7 @@ import {h, render} from 'preact';
 import Player from './components/player';
 
 
-if(location.protocol === 'http:') {
+if(location.protocol === 'http:' && location.hostname !== 'localhost') {
   location.replace('https://' + location.host + location.pathname);
 }
 
