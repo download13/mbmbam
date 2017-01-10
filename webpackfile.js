@@ -16,7 +16,8 @@ module.exports = [
 							['babel-preset-es2015', {modules: false}]
 						],
 						plugins: [
-							['transform-react-jsx', {pragma: 'h'}]
+							['transform-react-jsx', {pragma: 'h'}],
+							'babel-plugin-transform-object-rest-spread'
 						]
 					}
 				}
