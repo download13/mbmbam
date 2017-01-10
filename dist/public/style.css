@@ -48,7 +48,13 @@ input[type=number]::-webkit-outer-spin-button {
 }
 
 .player > .title {
-  font-size: 22px;
+  font-size: 16px;
+}
+
+@media (min-width: 600px) {
+  .player > .title {
+    font-size: 22px;
+  }
 }
 
 .player > .image {
@@ -73,6 +79,7 @@ input[type=number]::-webkit-outer-spin-button {
 
 .nav {
   display: flex;
+  border: solid 2px #f92977;
 }
 
 .nav > button {
@@ -91,5 +98,5 @@ input[type=number]::-webkit-outer-spin-button {
 .options {
   display: flex;
   justify-content: space-around;
-  margin-bottom: 20px;
+  margin-top: 20px;
 }

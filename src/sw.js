@@ -12,7 +12,8 @@ const precacheNetworkFirst = networkFirst('precache');
 
 router.get('/', precacheNetworkFirst);
 router.get('/style.css', precacheNetworkFirst);
-router.get('/media-embedded.css', precacheNetworkFirst);
+router.get('/icons.css', precacheNetworkFirst);
+router.get('/icons.woff', precacheNetworkFirst);
 router.get('/client.js', precacheNetworkFirst);
 router.get('/list/mbmbam', precacheNetworkFirst);
 
@@ -20,7 +21,7 @@ on('fetch', router.dispatch);
 
 on('install', e => {
   e.waitUntil(
-    cacheAll('precache', ['/', '/style.css', '/media-embedded.css', '/client.js', '/list/mbmbam'])
+    cacheAll('precache', ['/', '/style.css', '/icons.css', '/icons.woff', '/client.js', '/list/mbmbam'])
     .then(skipWaiting())
   );
 });
