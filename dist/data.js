@@ -14,6 +14,7 @@ const feedburner = new AsyncCache({
       let item;
       while(item = fp.read()) {
         episodes.unshift({
+          size: parseInt(item.enclosures[0].length),
           index: episodes.length,
           title: item.title,
           imageUrl: item.image.url,
