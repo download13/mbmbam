@@ -7,12 +7,14 @@ export default class Player extends Component {
 
     this.state = {
       currentPodcast: 'mbmbam',
+      currentAudioUrl: 'about:blank',
       episodes: [],
       index: 0,
       position: 0,
       duration: 0,
       autoplay: true,
-      offline: false
+      offline: false,
+      hasData: false
     };
   }
 
@@ -42,9 +44,28 @@ export default class Player extends Component {
     });
   }
 
-  render(props, {currentPodcast, index, episodes, autoplay, offline, position, duration}) {
-    const episode = episodes[index] || {};
-    const {title, imageUrl, audioUrl} = episode;
+  render(props, {
+    currentAudioUrl,
+    currentPodcast,
+    index,
+    episodes,
+    autoplay,
+    offline,
+    position,
+    duration,
+    hasData
+  }) {
+    const {title, imageUrl, audioUrl, status} = episodes[index] || {};
+
+    let downloadIcon = 'icon-download';
+    let downloadTitle = 'Download Episode';
+    if(status === 'downloading') {
+      downloadIcon = 'icon-spin';
+      downloadTitle = 'Downloading...'
+    } else if(status === 'downloaded') {
+      downloadIcon = 'icon-ok';
+      downloadTitle = 'Downloaded to Device';
+    }
 
     return <div class="player">
       <h1 class="title">{title}</h1>
@@ -55,7 +76,7 @@ export default class Player extends Component {
         controls
         autoplay={autoplay}
         preload="auto"
-        src={`/episodes/${currentPodcast}/${index}/audio`}
+        src={currentAudioUrl}
         onPause={() => this.save()}
         onEnded={() => this.episodeEnded()}
       ></audio>
@@ -79,6 +100,9 @@ export default class Player extends Component {
           <span class="icon-to-start-alt"></span>
         </button>
         <input type="number" onKeyUp={e => this.gotoIndexOnEnter(e)} onInput={e => this.gotoIndex(e)} value={index + 1}/>
+        <button onClick={() => this.cacheEpisode()} title={downloadTitle}>
+          <span class={downloadIcon}></span>
+        </button>
         <button onClick={() => this.nextEpisode()} title="Next Episode">
           <span class="icon-to-end-alt"></span>
         </button>
@@ -109,8 +133,29 @@ export default class Player extends Component {
   }
 
   selectEpisode(index) {
-    this.setState({index});
-    document.title = this.state.episodes[index].title;
+    const {currentPodcast, episodes, currentAudioUrl} = this.state;
+    const episodeUrl = getEpisodeUrl(currentPodcast, index);
+
+    caches.open('episodes')
+    .then(cache => cache.match(episodeUrl))
+    .then(res => {
+      if(res && res.ok) {
+        return res.blob();
+      }
+      return null;
+    })
+    .then(blob => {
+      if(currentAudioUrl) {
+        URL.revokeObjectURL(currentAudioUrl);
+      }
+
+      this.setEpisodeStatus(index, blob ? 'downloaded' : null);
+      this.setState({
+        index,
+        currentAudioUrl: blob ? URL.createObjectURL(blob) : getEpisodeUrl(currentPodcast, index)
+      });
+      document.title = episodes[index].title;
+    });
   }
 
   seekBackward(seconds) {
@@ -182,6 +227,29 @@ export default class Player extends Component {
       console.log('Invalid saved JSON');
     }
   }
+
+  cacheEpisode() {
+    const {currentPodcast, index, episodes} = this.state;
+    const episode = episodes[index];
+
+    if(episode.status) return;
+
+    this.setEpisodeStatus(index, 'downloading');
+
+    cacheEpisode(currentPodcast, index, episode.size)
+    .then(() => {
+      this.setEpisodeStatus(index, 'downloaded');
+    });
+  }
+
+  setEpisodeStatus(index, status) {
+    const {episodes} = this.state;
+    const episode = episodes[index];
+
+    episodes.splice(index, 1, {...episode, status});
+
+    this.setState({episodes: episodes.slice()});
+  }
 }
 
 function formatTime(n) {
@@ -202,6 +270,40 @@ function getEpisodes(name) {
     x.onerror = reject;
     x.send();
   });
+}
+
+function cacheEpisode(podcastName, index, fileSize, onProgress) {
+  const episodeUrl = getEpisodeUrl(podcastName, index);
+
+  return Promise.all([
+    caches.open('episodes'),
+    getRemoteFile(episodeUrl, onProgress)
+  ])
+  .then(([cache, buffer]) => cache.put(episodeUrl, new Response(buffer)));
+}
+
+function getRemoteFile(url, onProgress) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.responseType = 'arraybuffer';
+    if(onProgress) {
+      x.onprogress = e => onProgress(Math.floor(e.loaded / e.total));
+    }
+    x.onerror = reject;
+    x.onload = () => {
+      if(x.status === 200) {
+        resolve(x.response);
+      } else {
+        reject(new Error('Got ' + x.status + ' from ' + url))
+      }
+    };
+    x.open('GET', url, true);
+    x.send();
+  });
+}
+
+function getEpisodeUrl(podcastName, index) {
+  return `/episodes/${podcastName}/${index}/audio`;
 }
 
 function clamp(n, min, max) {
